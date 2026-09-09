@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: catoctin-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'release' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -59,7 +59,9 @@ jobs:
     needs: check
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'release' && !github.event.release.prerelease && 'prod' || 'nonprod' }}
+    environment:
+      name: ${{ github.event_name == 'release' && !github.event.release.prerelease && 'prod' || 'nonprod' }}
+      url: ${{ steps.deploy.outputs.url }}
     concurrency:
       group: deploy-${{ github.event_name == 'release' && !github.event.release.prerelease && 'prod' || 'nonprod' }}
       cancel-in-progress: false
@@ -86,10 +88,17 @@ jobs:
           vercel pull --yes --environment="$DEPLOY_TARGET" --token="$VERCEL_TOKEN"
           node --env-file=".vercel/.env.$DEPLOY_TARGET.local" scripts/check-env.mjs --allow-redacted
       - name: Build and deploy
+        id: deploy
         run: |
           set -euo pipefail
           flags=()
           if [[ "$DEPLOY_TARGET" == "production" ]]; then flags+=(--prod); fi
           vercel build "${flags[@]}" --token="$VERCEL_TOKEN"
           vercel deploy --prebuilt --target="$DEPLOY_TARGET" --token="$VERCEL_TOKEN" > deployment-url.txt
+          echo "url=$(cat deployment-url.txt)" >> "$GITHUB_OUTPUT"
           echo "Deployment: $(cat deployment-url.txt)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Update deployed-version badge
+        env:
+          DEPLOYMENT_ENV: ${{ github.event_name == 'release' && !github.event.release.prerelease && 'prod' || 'nonprod' }}
+          DEPLOYMENT_BADGE_TOKEN: ${{ secrets.DEPLOYMENT_BADGE_TOKEN }}
+        run: node scripts/publish-deployment-badge.mjs

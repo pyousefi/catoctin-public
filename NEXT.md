@@ -1,5 +1,11 @@
 # Next
 
+## 2026-09-09 — Track deployed versions at the top of README (#16)
+
+- Add live prod/nonprod version badges backed by a dedicated public metadata store, with no family-photo storage access.
+- Update only the deployed environment’s badge after successful deployment, using its exact release/preview version and commit. Let started deployment workflows finish before newer pushes, and link nonprod to deployment history with its site URL.
+- Validate version metadata and the store-specific credential before writing; cover environment isolation and publication failures.
+
 ## 2026-09-09 — Show deployed version and commit (#14)
 
 - Display the release version and short commit ID in the site footer and password screen, including mobile layouts.

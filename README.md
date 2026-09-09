@@ -1,5 +1,8 @@
 # Catoctin family & friends camp
 
+[![prod](https://img.shields.io/endpoint?url=https%3A%2F%2F1byocjticv9nhwmx.public.blob.vercel-storage.com%2Fprod.json)](https://www.campcatoctin.org)
+[![nonprod](https://img.shields.io/endpoint?url=https%3A%2F%2F1byocjticv9nhwmx.public.blob.vercel-storage.com%2Fnonprod.json)](https://github.com/pyousefi/catoctin/deployments/nonprod)
+
 A private, mobile-friendly photo scrapbook for Labor Day camp. Features 2026 and links the supplied Google albums for 2025, 2024, and 2010. Family members use one shared password; the organizer uses a separate password.
 
 ## What families can do
@@ -131,3 +134,5 @@ See [the security/storage decision](docs/decisions/0001-private-family-photo-sto
 Upload recovery reads phone originals with FileReader in 8 MiB chunks before and during multipart transfer. The first read precedes storage authorization, so immediately unreadable provider files do not reserve capacity. Reselecting failed originals replaces stale handles and preserves uploaded/confirmed items. The adapter chunk size does not cap the Blob SDK’s own multipart buffering. Authenticated failure diagnostics log only an attempt UUID, phase, byte count and fixed error category, once per phase/category per batch; they exclude filenames, attribution and raw errors. Physical Android/iOS provider handoffs still require device testing.
 
 The footer and password screen show the deployed version and short commit ID. CI embeds `NEXT_PUBLIC_APP_VERSION` from the release tag (or `preview` on main) and `NEXT_PUBLIC_APP_COMMIT` from the checked-out commit during the build. Manual preview builds should set both values; unconfigured local builds display `development`.
+
+README deployment badges update after a successful deployment and show that environment’s release/preview version plus short commit ID. Nonprod links to its GitHub deployment history, where each new deployment includes its site URL. Badge data is public version metadata in a dedicated Blob store; photo stores remain private. CDN/badge caches can delay updates by several minutes. Manual/out-of-band deployments must also run `scripts/publish-deployment-badge.mjs` with the verified environment, version, commit and dedicated `DEPLOYMENT_BADGE_TOKEN`; never use a photo-store token.
