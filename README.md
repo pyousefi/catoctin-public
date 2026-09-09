@@ -47,7 +47,7 @@ Unit tests replace external services. SQL integration tests use PGlite (an in-me
 
 ## Launch and deployment status
 
-[PR #1](https://github.com/pyousefi/catoctin/pull/1) implements [issue #2](https://github.com/pyousefi/catoctin/issues/2). [Verification evidence](docs/verification/2026-09-08-nonprod.md) records local and live nonprod checks. See [GitHub releases](https://github.com/pyousefi/catoctin/releases) and [deployment runs](https://github.com/pyousefi/catoctin/actions) for the current production version and deployment outcome.
+[PR #1](https://github.com/pyousefi/catoctin/pull/1) implements [issue #2](https://github.com/pyousefi/catoctin/issues/2). [Launch verification](docs/verification/2026-09-08-nonprod.md) and [mobile/deletion evidence](docs/verification/2026-09-09-mobile-and-deletion.md) record local and live nonproduction checks. See [GitHub releases](https://github.com/pyousefi/catoctin/releases) and [deployment runs](https://github.com/pyousefi/catoctin/actions) for the current production version and deployment outcome.
 
 The repository is private. GitHub `nonprod`/`prod` environments contain project/team identifiers and inherit the repository-level `VERCEL_TOKEN`. Each environment uses separate Neon and private Blob resources. Production is served at `https://www.campcatoctin.org`; the apex redirects there.
 
@@ -105,6 +105,10 @@ Use synthetic photos in nonprod; do not copy family originals there.
 5. Add a test photo to the intended Google album manually, confirm it there, and only then mark it as added on the site.
 6. Confirm release logs contain the intended SHA/environment and production uses its own secrets and stores. Test on an actual iPhone and Android phone; Chromium mobile emulation is not an iOS Safari test.
 
+## Administrator photo deletion
+
+“Hide from family” keeps the original and its storage reservation. “Delete permanently” requires confirmation, removes the original from this site and frees reserved storage. It cannot be undone and does not affect copies in Google Photos or files someone has downloaded. A failed deletion can be retried; capacity is released only when cleanup finishes. An empty private marker remains at the old storage path to prevent unexpired upload tokens from recreating the original. See [the deletion decision](docs/decisions/0002-admin-permanent-photo-deletion/README.md).
+
 ## Mobile upload troubleshooting
 
 For Google Photos and other phone apps, see the [device/source matrix, recovery steps and evidence checklist](docs/testing/mobile-uploads.md). Use small batches and locally downloaded originals as an immediate workaround. Automated browser tests include Android Chromium and iPhone WebKit; native app handoffs still require actual-device testing.
@@ -114,7 +118,7 @@ For Google Photos and other phone apps, see the [device/source matrix, recovery 
 - Session cookies are HTTP-only, Secure in production, SameSite=Lax, and expire in seven days. Rotate `SESSION_SECRET` to revoke all existing sessions. Changing a password alone prevents new sign-ins but does not revoke existing sessions.
 - Password attempts are limited to 15 per IP per 15 minutes in Postgres; database failure blocks sign-in. Expired `rate_limits` rows can be pruned during maintenance.
 - `MAX_STORAGE_BYTES` defaults to 50 GiB of reserved originals. Atomic database reservations prevent concurrent uploads from exceeding this cap. It is not a billing cap: reads, transfer, and database usage can still incur charges. Configure provider spend alerts as appropriate.
-- Failed/abandoned uploads retain pending reservations until reconciliation. Run `node --env-file=.env.local scripts/reconcile-uploads.mjs` to inspect reservations older than 48 hours; add `--apply` after reviewing the dry run. It recovers matching originals and atomically releases only reservations confirmed absent by Blob. Authentication/service errors stop the command; mismatched originals retain capacity for manual review. No stored files are deleted. No automatic retention runs.
+- Failed/abandoned uploads retain pending reservations until reconciliation. Run `node --env-file=.env.local scripts/reconcile-uploads.mjs` to inspect reservations older than 48 hours; add `--apply` after reviewing the dry run. It recovers matching originals and atomically releases only reservations confirmed absent by Blob. Authentication/service errors stop the command; mismatched originals retain capacity for manual review. Reconciliation does not delete stored files. Administrator-confirmed deletion is separate; no automatic retention runs.
 - The gallery loads originals lazily, so large originals can use substantial bandwidth. Introduce separately stored thumbnails when actual usage justifies that additional image-processing surface; preserve the original as the source of truth.
 - Back up Postgres and private originals independently. The site is a sharing tool, not the sole backup of family memories.
 - Real shared-album URLs belong only in the server-only `GOOGLE_ALBUM_<year>_URL` environment variables. Never commit them, include them in client imports, or copy them into test fixtures. Keep the repository private while historical commits contain links.

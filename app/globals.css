@@ -1599,3 +1599,19 @@ progress {
     transition: none !important;
   }
 }
+
+.delete-dialog {
+  width: min(440px, calc(100% - 32px));
+  margin: auto;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.delete-dialog::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+.delete-dialog p {
+  margin: 16px 0;
+}

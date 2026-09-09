@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Download, Eye, EyeOff, Image as ImageIcon } from "lucide-react";
 import type { Photo } from "@/lib/db";
 import { canPreview, formatBytes } from "@/lib/uploads";
 export function AdminQueue({
-  photos,
+  photos: initialPhotos,
 }: {
   photos: (Photo & { hidden?: boolean })[];
 }) {
@@ -13,6 +13,13 @@ export function AdminQueue({
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState<Photo | null>(null);
+  const [deleted, setDeleted] = useState<string[]>([]);
+  const deleteDialog = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    if (deleting) deleteDialog.current?.showModal();
+  }, [deleting]);
+  const photos = initialPhotos.filter((photo) => !deleted.includes(photo.id));
   const bytes = photos
     .filter((photo) => selected.includes(photo.id))
     .reduce((sum, p) => sum + Number(p.size), 0);
@@ -35,6 +42,29 @@ export function AdminQueue({
         error instanceof Error
           ? error.message
           : "Update failed. Please try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function removePhoto() {
+    if (!deleting || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/admin/photos/${deleting.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error((await response.json()).error);
+      setDeleted((current) => [...current, deleting.id]);
+      setSelected((current) => current.filter((id) => id !== deleting.id));
+      setDeleting(null);
+      router.refresh();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Deletion failed. Please retry.",
       );
     } finally {
       setBusy(false);
@@ -142,11 +172,69 @@ export function AdminQueue({
                 {photo.hidden ? <Eye size={17} /> : <EyeOff size={17} />}{" "}
                 {photo.hidden ? "Show to family" : "Hide from family"}
               </button>
+              <button
+                className="text-link"
+                type="button"
+                disabled={busy || deleting !== null}
+                aria-label={`Delete ${photo.name}`}
+                onClick={() => {
+                  setError("");
+                  setDeleting(photo);
+                }}
+              >
+                Delete permanently
+              </button>
             </div>
           </article>
         ))}
       </form>
-      {error && (
+      {deleting && (
+        <dialog
+          ref={deleteDialog}
+          className="delete-dialog"
+          aria-labelledby="delete-photo-heading"
+          onCancel={(event) => {
+            event.preventDefault();
+            if (!busy) {
+              setDeleting(null);
+              setError("");
+            }
+          }}
+        >
+          <h3 id="delete-photo-heading">Permanently delete {deleting.name}?</h3>
+          <p>
+            This removes the original from this site and frees{" "}
+            {formatBytes(Number(deleting.size))} of storage. It cannot be
+            undone. Copies already downloaded or added to Google Photos are
+            unaffected.
+          </p>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            className="button"
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setDeleting(null);
+              setError("");
+            }}
+          >
+            Cancel deletion
+          </button>{" "}
+          <button
+            className="button primary"
+            type="button"
+            disabled={busy}
+            onClick={removePhoto}
+          >
+            {busy ? "Deleting…" : "Yes, permanently delete"}
+          </button>
+        </dialog>
+      )}
+      {error && !deleting && (
         <p className="error" role="alert">
           {error}
         </p>

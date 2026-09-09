@@ -1,5 +1,12 @@
 # Next
 
+## 2026-09-09 — Let organizers permanently delete photos (#9)
+
+- Add a named, explicit confirmation separate from hiding. Restrict deletion to same-origin administrator requests and ready photos.
+- Replace the private original with an empty marker before atomically removing metadata and releasing its reserved capacity; the SDK receives an empty Node buffer, and the marker blocks replay of unexpired upload tokens. Preserve retry information after partial failure and release capacity only once under concurrent requests.
+- Verify 87 unit/integration tests and 52 browser checks. Live nonproduction tests cover a 27 MB interrupted multipart upload, confirmation-only retry, 50 uploaded originals with matching download hashes, deletion cancellation/retry and rejection of ordinary/preinitiated token replay.
+- Exercise authorization, service failures, repeated/concurrent requests and database rollback with mocked services and PGlite. Record the irreversible-deletion decision in ADR 0002 and its replay-resistant storage strategy in ADR 0003.
+
 ## 2026-09-09 — Improve mobile photo selection and recovery (#7)
 
 - Add MIME picker hints, deduplicate selections within a batch, report omitted photo counts, and give local-download guidance for empty/unreadable provider files. Preserve direct multipart transfer and original bytes.

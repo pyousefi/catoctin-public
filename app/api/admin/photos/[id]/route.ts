@@ -1,6 +1,36 @@
 import { z } from "zod";
 import { session, sameOrigin } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { deletePhoto } from "@/lib/delete-photo";
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  if (!sameOrigin(request))
+    return Response.json({ error: "Invalid origin" }, { status: 403 });
+  if ((await session())?.role !== "admin")
+    return Response.json({ error: "Admin sign-in required." }, { status: 403 });
+  const { id } = await params;
+  if (!z.uuid().safeParse(id).success)
+    return Response.json({ error: "Not found" }, { status: 404 });
+  try {
+    if ((await deletePhoto(id)) === "not-ready")
+      return Response.json(
+        { error: "This photo is not ready for deletion." },
+        { status: 409 },
+      );
+    return new Response(null, { status: 204 });
+  } catch {
+    return Response.json(
+      {
+        error:
+          "Couldn’t finish deleting this photo. Please retry. Storage is released only when deletion finishes.",
+      },
+      { status: 503 },
+    );
+  }
+}
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
