@@ -105,6 +105,10 @@ Use synthetic photos in nonprod; do not copy family originals there.
 5. Add a test photo to the intended Google album manually, confirm it there, and only then mark it as added on the site.
 6. Confirm release logs contain the intended SHA/environment and production uses its own secrets and stores. Test on an actual iPhone and Android phone; Chromium mobile emulation is not an iOS Safari test.
 
+## Mobile upload troubleshooting
+
+For Google Photos and other phone apps, see the [device/source matrix, recovery steps and evidence checklist](docs/testing/mobile-uploads.md). Use small batches and locally downloaded originals as an immediate workaround. Automated browser tests include Android Chromium and iPhone WebKit; native app handoffs still require actual-device testing.
+
 ## Operations and limits
 
 - Session cookies are HTTP-only, Secure in production, SameSite=Lax, and expire in seven days. Rotate `SESSION_SECRET` to revoke all existing sessions. Changing a password alone prevents new sign-ins but does not revoke existing sessions.

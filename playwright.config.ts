@@ -5,7 +5,8 @@ export default defineConfig({
   fullyParallel: true,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://localhost:3100",
+    ignoreHTTPSErrors: true,
+    baseURL: "https://localhost:3100",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
@@ -15,12 +16,16 @@ export default defineConfig({
       name: "mobile",
       use: { ...devices["iPhone 13"], defaultBrowserType: "chromium" },
     },
+    { name: "android", use: { ...devices["Pixel 7"] } },
+    { name: "safari", use: { ...devices["iPhone 13"] } },
   ],
   webServer: {
-    command: "npm run start -- --port 3100",
-    url: "http://localhost:3100/login",
+    command: "node scripts/browser-test-server.mjs",
+    url: "https://localhost:3100/login",
     reuseExistingServer: false,
+    ignoreHTTPSErrors: true,
     env: {
+      NODE_ENV: "production",
       SESSION_SECRET: secret,
       DATABASE_URL: "",
       FAMILY_PASSWORD_HASH: "",

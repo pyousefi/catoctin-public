@@ -11,7 +11,12 @@ import {
   X,
 } from "lucide-react";
 import { years } from "@/lib/albums";
-import { formatBytes, MAX_FILE_BYTES, photoType } from "@/lib/uploads";
+import { formatBytes, photoType } from "@/lib/uploads";
+import {
+  PHOTO_ACCEPT,
+  selectPhotos,
+  uploadFailureMessage,
+} from "@/lib/photo-selection";
 type Item = {
   id: string;
   file: File;
@@ -34,45 +39,20 @@ export function UploadForm() {
     );
   function choose(files: FileList | null) {
     if (!files || busy) return;
-    const errors: string[] = [];
-    const chosen: Item[] = [];
-    for (const file of Array.from(files)) {
-      if (!photoType(file.name)) {
-        errors.push(
-          `${file.name}: choose a JPG, PNG, HEIC, HEIF, WebP, AVIF, TIFF, or DNG photo.`,
-        );
-        continue;
-      }
-      if (file.size === 0 || file.size > MAX_FILE_BYTES) {
-        errors.push(`${file.name}: photos must be between 1 byte and 200 MB.`);
-        continue;
-      }
-      if (file.name.length > 180 || /[\x00-\x1f/\\]/.test(file.name)) {
-        errors.push(
-          `${file.name}: please give this photo a shorter, simpler filename.`,
-        );
-        continue;
-      }
-      if (
-        items.some(
-          (item) =>
-            item.file.name === file.name &&
-            item.file.size === file.size &&
-            item.file.lastModified === file.lastModified,
-        )
-      )
-        continue;
-      chosen.push({
+    const selection = selectPhotos(
+      items.map((item) => item.file),
+      Array.from(files),
+    );
+    setItems((current) => [
+      ...current,
+      ...selection.files.map((file) => ({
         id: crypto.randomUUID(),
         file,
-        state: "waiting",
+        state: "waiting" as const,
         progress: 0,
-      });
-    }
-    if (items.length + chosen.length > 50)
-      errors.push("Please share up to 50 photos at a time.");
-    setItems((current) => [...current, ...chosen].slice(0, 50));
-    setNotice(errors.join(" "));
+      })),
+    ]);
+    setNotice(selection.notice);
     if (fileInput.current) fileInput.current.value = "";
   }
   async function send(event: React.FormEvent<HTMLFormElement>) {
@@ -136,7 +116,7 @@ export function UploadForm() {
         update(item.id, {
           state: "error",
           pathname,
-          error: error instanceof Error ? error.message : "Please try again.",
+          error: uploadFailureMessage(error, Boolean(pathname)),
         });
       }
     }
@@ -197,7 +177,7 @@ export function UploadForm() {
           type="file"
           id="photos"
           multiple
-          accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.avif,.tif,.tiff,.dng"
+          accept={PHOTO_ACCEPT}
           className="visually-hidden"
           disabled={busy || complete}
           onChange={(event) => choose(event.target.files)}
@@ -214,6 +194,11 @@ export function UploadForm() {
           Or drop them here · Up to 50 photos, 200 MB each
         </span>
       </div>
+      <p className="muted">
+        Choosing from Google Photos or another cloud app? Wait for the originals
+        to download. If selection fails, try 5–10 photos at a time, or download
+        them to your phone and choose them from Files or Gallery.
+      </p>
       <label htmlFor="caption">
         A little story to go with them{" "}
         <span className="optional">(optional)</span>

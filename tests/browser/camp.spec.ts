@@ -21,6 +21,7 @@ async function signIn(
       domain: "localhost",
       path: "/",
       httpOnly: true,
+      secure: true,
       sameSite: "Lax",
     },
   ]);
@@ -206,7 +207,7 @@ test("empty photos are rejected before any upload starts", async ({
   });
 
   await expect(page.locator("main").getByRole("alert")).toContainText(
-    "photos must be between 1 byte and 200 MB",
+    "Download the original to your phone",
   );
   await expect(
     page.getByRole("button", { name: "Share your photos" }),
@@ -279,4 +280,59 @@ test("a failed upload can be retried with its chosen year and contributor", asyn
       contributor: "Test camper",
     });
   }
+});
+
+test("a large photo uses multipart and its failure does not stop the remaining queue", async ({
+  page,
+  context,
+}) => {
+  const attempts: Array<{ multipart: boolean; size: number; name: string }> =
+    [];
+  await page.route("**/api/uploads", async (route) => {
+    const body = route.request().postDataJSON();
+    attempts.push({
+      multipart: body.payload.multipart,
+      ...JSON.parse(body.payload.clientPayload),
+    });
+    await route.fulfill({
+      status: 400,
+      json: { error: "Test upload unavailable" },
+    });
+  });
+  await signIn(context);
+  await page.goto("/");
+  await page.getByLabel("Your name").fill("Test camper");
+  await expect(page.locator('input[type="file"]')).toHaveAttribute(
+    "accept",
+    /image\/jpeg/,
+  );
+  await page.locator('input[type="file"]').setInputFiles([
+    {
+      name: "large.HEIC",
+      mimeType: "image/heic",
+      buffer: Buffer.alloc(9 * 1024 * 1024),
+    },
+    {
+      name: "small.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from([255, 216, 255, 217]),
+    },
+  ]);
+  await page
+    .getByRole("button", { name: "Share 2 photos", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Retry unfinished photos" }),
+  ).toBeEnabled();
+  expect(attempts).toEqual([
+    expect.objectContaining({
+      multipart: true,
+      size: 9 * 1024 * 1024,
+      name: "large.HEIC",
+    }),
+    expect.objectContaining({ multipart: true, size: 4, name: "small.jpg" }),
+  ]);
+  await expect(page.getByLabel("Selected photos")).toContainText(
+    "Keep this page open and retry",
+  );
 });

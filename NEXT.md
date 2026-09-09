@@ -1,5 +1,13 @@
 # Next
 
+## 2026-09-09 — Improve mobile photo selection and recovery (#7)
+
+- Add MIME picker hints, deduplicate selections within a batch, report omitted photo counts, and give local-download guidance for empty/unreadable provider files. Preserve direct multipart transfer and original bytes.
+- Distinguish failed save confirmation from failed transfer, with retry instructions that retain the current page state.
+- Run the production browser-test server over temporary local HTTPS so WebKit exercises secure-cookie logout under the same transport as deployments.
+- Exclude local token-tool cache files from formatting checks.
+- Cover size/count boundaries and multipart request/queue continuation; add Android Chromium and iPhone WebKit browser projects and an actual-device/source test matrix. Native Google Photos handoff and live large-file recovery remain to be verified.
+
 ## 2026-09-08 — Add Vercel Speed Insights (#3)
 
 - Install `@vercel/speed-insights` and render its Next.js component beside Analytics in the root layout to collect page performance measurements.
