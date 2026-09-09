@@ -1,3 +1,7 @@
+## 2026-09-09 — Scan credentials and private album links in CI (#20)
+
+- Add checksum-pinned Gitleaks with default credential rules and Google Photos shared-link detection across HEAD ancestry, including merge-only changes. Verify redaction, exact synthetic-fixture exceptions, and a single historical public-digest fingerprint with disposable Git fixtures. Document the retained PR-reference exposure and required public-readiness follow-up.
+
 # Next
 
 ## 2026-09-09 — Unblock mobile browser verification (#7)

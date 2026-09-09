@@ -1,0 +1,15 @@
+title = "Catoctin credentials and private album links"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "google-photos-shared-link"
+description = "Google Photos shared links grant access to private family albums"
+regex = '''(?i)(?:https?://)?(?:photos\.app\.goo\.gl/|photos\.google\.com/(?:u/\d+/)?share/)[a-z0-9_-]+(?:[/?#][^\s"'<>`\\)]*)?'''
+keywords = ["photos.app.goo.gl", "photos.google.com"]
+
+[[rules.allowlists]]
+description = "Exact synthetic album IDs used by the existing browser and environment fixtures"
+regexTarget = "match"
+regexes = ['''^(?:https?://)?photos\.app\.goo\.gl/test(?:2026|2025|2024|2010)?$''']
