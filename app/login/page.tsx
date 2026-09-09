@@ -1,3 +1,4 @@
+import { SiteVersion } from "@/components/site-version";
 import Link from "next/link";
 import { Trees } from "lucide-react";
 import { CampScene } from "@/components/camp-scene";
@@ -50,6 +51,9 @@ export default async function Login({
         </div>
       </div>
       <p className="login-bottom">Labor Day weekends. Lifelong memories.</p>
+      <div className="login-version">
+        <SiteVersion />
+      </div>
     </main>
   );
 }

@@ -1,3 +1,4 @@
+import { SiteVersion } from "./site-version";
 import Link from "next/link";
 import { Trees, ArrowUpRight, LogOut } from "lucide-react";
 export function Header({ admin = false }: { admin?: boolean }) {
@@ -39,6 +40,7 @@ export function Footer() {
       </div>
       <p>Made for the memories. See you next summer.</p>
       <Link href="/admin">Organizer sign-in</Link>
+      <SiteVersion />
     </footer>
   );
 }

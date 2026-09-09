@@ -851,6 +851,7 @@ progress {
   font-size: 12px;
 }
 .site-footer {
+  flex-wrap: wrap;
   border-top: 1px solid var(--line);
   padding: 25px max(34px, calc((100vw - 1132px) / 2));
   display: flex;
@@ -1627,4 +1628,14 @@ progress {
   overflow-y: auto;
   overflow-wrap: anywhere;
   padding-left: 20px;
+}
+
+.site-version {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.login-version {
+  margin-top: 24px;
+  text-align: center;
 }

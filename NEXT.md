@@ -1,5 +1,10 @@
 # Next
 
+## 2026-09-09 — Show deployed version and commit (#14)
+
+- Display the release version and short commit ID in the site footer and password screen, including mobile layouts.
+- Embed release metadata during CI deployment; label main builds as preview and unconfigured local builds as development.
+
 ## 2026-09-09 — Diagnose and recover Android photo-source read failures (#7)
 
 - Preserve picker selections and read originals through FileReader in bounded 8 MiB chunks, checking the first chunk before requesting upload storage. Keep original bytes and multipart progress.
