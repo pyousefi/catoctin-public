@@ -1,0 +1,44 @@
+{
+  "name": "catoctin-family-camp",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname localhost",
+    "build": "next build",
+    "start": "next start --hostname localhost",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
+    "password:hash": "node scripts/hash-password.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/blob": "^2.8.0",
+    "archiver": "^8.0.0",
+    "lucide-react": "^0.577.0",
+    "next": "^16.3.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "server-only": "^0.0.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.58.2",
+    "@types/archiver": "^8.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "prettier": "^3.9.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  }
+}
