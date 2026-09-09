@@ -28,6 +28,7 @@ vi.mock("@vercel/blob", async (original) => ({
 }));
 vi.mock("@vercel/blob/client", () => ({ handleUpload: mocks.handleUpload }));
 import { POST } from "@/app/api/uploads/route";
+import { GET as selectAllPhotos } from "@/app/api/admin/photos/route";
 import { deletePhoto } from "@/lib/delete-photo";
 import { completeUpload } from "@/lib/complete-upload";
 let database: PGlite;
@@ -229,5 +230,32 @@ describe("Postgres deletion accounting", () => {
     await deletePhoto(id);
     expect(await budget()).toBe(0);
     expect((await database.query("SELECT id FROM photos")).rows).toEqual([]);
+  });
+});
+
+describe("Postgres selection across pages", () => {
+  it("selects all ready originals in the chosen year, including hidden photos, without a page limit", async () => {
+    await database.exec(`INSERT INTO photos(id, year, name, contributor, size, content_type, pathname, session_id, status, hidden)
+      SELECT ('10000000-0000-4000-8000-' || lpad(n::text, 12, '0'))::uuid,
+        CASE WHEN n <= 28 THEN 2026 ELSE 2025 END, 'selection-' || n || '.jpg', 'Test', 100, 'image/jpeg',
+        'photos/selection-' || n || '.jpg', '${sessionId}',
+        CASE WHEN n = 27 THEN 'pending' WHEN n = 28 THEN 'archived' ELSE 'ready' END,
+        n = 26
+      FROM generate_series(1, 30) n`);
+    mocks.session.mockResolvedValue({ role: "admin" });
+    const response = await selectAllPhotos(
+      new Request("https://camp.example/api/admin/photos?year=2026"),
+    );
+    const { photos } = await response.json();
+    expect(photos).toHaveLength(26);
+    expect(photos.map((photo: { name: string }) => photo.name)).toContain(
+      "selection-26.jpg",
+    );
+    expect(photos.map((photo: { name: string }) => photo.name)).not.toContain(
+      "selection-29.jpg",
+    );
+    expect(photos.every((photo: { size: number }) => photo.size === 100)).toBe(
+      true,
+    );
   });
 });

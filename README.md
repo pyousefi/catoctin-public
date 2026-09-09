@@ -107,7 +107,9 @@ Use synthetic photos in nonprod; do not copy family originals there.
 
 ## Administrator photo deletion
 
-“Hide from family” keeps the original and its storage reservation. “Delete permanently” requires confirmation, removes the original from this site and frees reserved storage. It cannot be undone and does not affect copies in Google Photos or files someone has downloaded. A failed deletion can be retried; capacity is released only when cleanup finishes. An empty private marker remains at the old storage path to prevent unexpired upload tokens from recreating the original. See [the deletion decision](docs/decisions/0002-admin-permanent-photo-deletion/README.md).
+“Select all” selects every ready original in the chosen camp year across all pages, including hidden photos. Download and Delete show the selected count. ZIP downloads remain limited to 50 originals and 1 GB; larger selections can still be deleted after confirmation. Selection resets when changing years.
+
+“Hide from family” keeps the original and its storage reservation. “Delete permanently” requires confirmation, removes the original from this site and frees reserved storage. It cannot be undone and does not affect copies in Google Photos or files someone has downloaded. Bulk deletion confirms the selected filenames, processes them one at a time and retains failed items for retry. Keep the page open until it finishes. A failed deletion can be retried; capacity is released only when cleanup finishes. An empty private marker remains at the old storage path to prevent unexpired upload tokens from recreating the original. See [the deletion decision](docs/decisions/0002-admin-permanent-photo-deletion/README.md).
 
 ## Mobile upload troubleshooting
 

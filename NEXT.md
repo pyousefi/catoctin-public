@@ -1,5 +1,13 @@
 # Next
 
+## 2026-09-09 — Select all originals in a year and delete selected originals (#11)
+
+- Replace page-only selection with an explicit year-wide snapshot across pages, including hidden originals; reset selection when changing years.
+- Show counted Download and Delete actions, submit off-page selections to ZIP downloads, and explain the existing 50-original/1 GiB ZIP limits.
+- Confirm the exact deletion set and process it sequentially through the existing protected deletion endpoint. Remove successful items immediately and retain failures for retry.
+- Cover selection authorization, year/status filters, progress, failure handling and retry; record scope and irreversible-operation semantics in ADR 0004.
+- Verify 100 unit/integration tests and 52 browser checks; live preview confirms 51-photo selection, exact 49-file ZIP scope, year-change races, cancellation, frozen confirmation and retry-only failures. Record evidence in `docs/verification/2026-09-09-admin-bulk-selection.md`.
+
 ## 2026-09-09 — Let organizers permanently delete photos (#9)
 
 - Add a named, explicit confirmation separate from hiding. Restrict deletion to same-origin administrator requests and ready photos.

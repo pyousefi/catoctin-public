@@ -1055,6 +1055,7 @@ progress {
 }
 .queue-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
@@ -1614,4 +1615,16 @@ progress {
 }
 .delete-dialog p {
   margin: 16px 0;
+}
+
+.queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.delete-file-list {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  padding-left: 20px;
 }

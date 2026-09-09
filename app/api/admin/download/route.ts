@@ -4,6 +4,7 @@ import { get } from "@vercel/blob";
 import { z } from "zod";
 import { session, sameOrigin } from "@/lib/auth";
 import { db, type Photo } from "@/lib/db";
+import { MAX_DOWNLOAD_BYTES, MAX_DOWNLOAD_PHOTOS } from "@/lib/admin-selection";
 export const maxDuration = 300;
 export async function POST(request: Request) {
   if (!sameOrigin(request))
@@ -12,7 +13,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "Admin sign-in required." }, { status: 403 });
   try {
     const form = await request.formData();
-    const ids = z.array(z.uuid()).min(1).max(50).parse(form.getAll("id"));
+    const ids = z
+      .array(z.uuid())
+      .min(1)
+      .max(MAX_DOWNLOAD_PHOTOS)
+      .parse(form.getAll("id"));
     const sql = db();
     const photos =
       (await sql`SELECT * FROM photos WHERE id = ANY(${ids}::uuid[]) AND status = 'ready' ORDER BY year DESC, created_at`) as Photo[];
@@ -21,7 +26,7 @@ export async function POST(request: Request) {
         { error: "Some photos are no longer available." },
         { status: 404 },
       );
-    if (photos.reduce((sum, p) => sum + Number(p.size), 0) > 1024 * 1024 * 1024)
+    if (photos.reduce((sum, p) => sum + Number(p.size), 0) > MAX_DOWNLOAD_BYTES)
       return Response.json(
         { error: "Please select less than 1 GB at a time." },
         { status: 400 },

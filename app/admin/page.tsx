@@ -90,7 +90,7 @@ export default async function Admin({
             again.
           </p>
         ) : (
-          <AdminQueue photos={photos} />
+          <AdminQueue key={album.year} year={album.year} photos={photos} />
         )}
         <div className="pagination">
           {page > 1 && (
