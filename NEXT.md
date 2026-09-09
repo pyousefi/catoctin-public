@@ -1,5 +1,10 @@
 # Next
 
+## 2026-09-08 — Add Vercel Speed Insights (#3)
+
+- Install `@vercel/speed-insights` and render its Next.js component beside Analytics in the root layout to collect page performance measurements.
+- Verify formatting, TypeScript, the production build, unit/integration tests, and all 24 desktop/mobile UI checks.
+
 ## 2026-09-08 — Fix browser logout rejecting its own form (#2)
 
 - Use a same-origin referrer policy so native internal POST forms send their origin and pass the existing CSRF check. The previous no-referrer policy sent an opaque origin and produced a 403 on logout; external destinations still receive no referrer.
