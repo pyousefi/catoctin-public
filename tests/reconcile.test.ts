@@ -57,3 +57,139 @@ describe("abandoned upload recovery", () => {
     expect(sql.mock.calls[1][0].join("")).toContain("RETURNING size");
   });
 });
+
+const r2Photo = {
+  ...photo,
+  pathname: `r2/production/${photo.pathname}`,
+  r2_upload_id: "multipart-id",
+};
+const missingR2 = () =>
+  Object.assign(new Error("missing"), { name: "NotFound" });
+const completeR2 = { ContentLength: 20, ContentType: "image/jpeg" };
+
+function r2Setup() {
+  return {
+    sql: vi.fn().mockResolvedValueOnce([r2Photo]).mockResolvedValue([]),
+    inspectBlob: vi.fn(),
+    r2: { bucket: "catoctin", s3: { send: vi.fn() } },
+  };
+}
+
+describe("abandoned R2 multipart upload recovery", () => {
+  it("inspects R2 directly and does not abort missing uploads in dry run", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    r2.s3.send.mockRejectedValue(missingR2());
+    expect(await reconcilePending(sql, inspectBlob, false, r2)).toEqual([
+      { id: photo.id, action: "would-release-missing-reservation" },
+    ]);
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(inspectBlob).not.toHaveBeenCalled();
+    expect(r2.s3.send).toHaveBeenCalledTimes(1);
+    expect(r2.s3.send.mock.calls[0][0].constructor.name).toBe(
+      "HeadObjectCommand",
+    );
+  });
+
+  it("recovers a completed matching original and clears its multipart ID", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    r2.s3.send.mockResolvedValue(completeR2);
+    expect(await reconcilePending(sql, inspectBlob, true, r2)).toEqual([
+      { id: photo.id, action: "recovered" },
+    ]);
+    expect(r2.s3.send).toHaveBeenCalledTimes(1);
+    expect(sql.mock.calls[1][0].join("")).toContain("r2_upload_id = NULL");
+    expect(inspectBlob).not.toHaveBeenCalled();
+  });
+
+  it("aborts the recorded multipart upload before atomically releasing capacity", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    const order: string[] = [];
+    r2.s3.send.mockImplementation(async (command) => {
+      order.push(command.constructor.name);
+      if (command.constructor.name === "HeadObjectCommand") throw missingR2();
+      return {};
+    });
+    sql
+      .mockReset()
+      .mockResolvedValueOnce([r2Photo])
+      .mockImplementationOnce(async () => {
+        order.push("release");
+        return [];
+      });
+    await reconcilePending(sql, inspectBlob, true, r2);
+    expect(order).toEqual([
+      "HeadObjectCommand",
+      "AbortMultipartUploadCommand",
+      "HeadObjectCommand",
+      "release",
+    ]);
+    expect(r2.s3.send.mock.calls[1][0].input).toEqual({
+      Bucket: "catoctin",
+      Key: r2Photo.pathname,
+      UploadId: "multipart-id",
+    });
+    expect(sql.mock.calls[1][0].join("")).toContain(
+      "r2_upload_id IS NOT DISTINCT FROM",
+    );
+    expect(sql.mock.calls[1][0].join("")).toContain("RETURNING size");
+  });
+
+  it("tolerates only a confirmed already-absent multipart upload", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    r2.s3.send
+      .mockRejectedValueOnce(missingR2())
+      .mockRejectedValueOnce(
+        Object.assign(new Error("absent upload"), { name: "NoSuchUpload" }),
+      )
+      .mockRejectedValueOnce(missingR2());
+    expect((await reconcilePending(sql, inspectBlob, true, r2))[0].action).toBe(
+      "released-missing-reservation",
+    );
+    expect(sql).toHaveBeenCalledTimes(2);
+  });
+
+  it("recovers an original completed concurrently with abort", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    r2.s3.send
+      .mockRejectedValueOnce(missingR2())
+      .mockRejectedValueOnce(
+        Object.assign(new Error("completed upload"), { name: "NoSuchUpload" }),
+      )
+      .mockResolvedValueOnce(completeR2);
+    expect((await reconcilePending(sql, inspectBlob, true, r2))[0].action).toBe(
+      "recovered",
+    );
+    expect(sql.mock.calls[1][0].join("")).toContain("status = 'ready'");
+  });
+
+  it("retains capacity when multipart abort fails", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    r2.s3.send
+      .mockRejectedValueOnce(missingR2())
+      .mockRejectedValueOnce(new Error("Access denied"));
+    await expect(reconcilePending(sql, inspectBlob, true, r2)).rejects.toThrow(
+      "Access denied",
+    );
+    expect(sql).toHaveBeenCalledTimes(1);
+  });
+
+  it("never falls back to Blob or releases capacity on R2 access errors", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    r2.s3.send.mockRejectedValue(new Error("R2 access denied"));
+    await expect(reconcilePending(sql, inspectBlob, true, r2)).rejects.toThrow(
+      "R2 access denied",
+    );
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(inspectBlob).not.toHaveBeenCalled();
+  });
+
+  it("retains capacity for mismatched completed R2 originals", async () => {
+    const { sql, inspectBlob, r2 } = r2Setup();
+    r2.s3.send.mockResolvedValue({ ...completeR2, ContentLength: 19 });
+    expect((await reconcilePending(sql, inspectBlob, true, r2))[0].action).toBe(
+      "manual-review",
+    );
+    expect(sql).toHaveBeenCalledTimes(1);
+    expect(r2.s3.send).toHaveBeenCalledTimes(1);
+  });
+});

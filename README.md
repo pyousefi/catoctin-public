@@ -29,14 +29,14 @@ npm run password:hash
 # Generate separate family/admin hashes, and put them in .env.local.
 openssl rand -hex 32
 # Put the generated random value in SESSION_SECRET.
-# Add a Neon DATABASE_URL, a PRIVATE Vercel BLOB_READ_WRITE_TOKEN,
+# Add a Neon DATABASE_URL and private R2 credentials,
 # and the four GOOGLE_ALBUM_<year>_URL values from the organizer.
 npm run db:setup
 node --env-file=.env.local scripts/check-env.mjs
 npm run dev
 ```
 
-The password helper reads hidden terminal input. Never put plaintext passwords in source or command-line arguments. Give family and admin different passwords (12+ characters). Nonproduction must use different passwords, signing secrets, databases, and Blob storage from production. With missing configuration, sign-in fails closed and displays a setup message.
+The password helper reads hidden terminal input. Never put plaintext passwords in source or command-line arguments. Give family and admin different passwords (12+ characters). Nonproduction must use different passwords, signing secrets, databases, and R2 prefixes from production. With missing configuration, sign-in fails closed and displays a setup message.
 
 ```bash
 npm run typecheck
@@ -46,13 +46,13 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Unit tests replace external services. SQL integration tests use PGlite (an in-memory PostgreSQL runtime) to exercise the actual schema, reservation constraints, and upload ownership without contacting Neon. PGlite is a development-only dependency; it does not replace Neon at runtime. Browser tests use signed test sessions and deliberately unavailable storage, exercising the mobile/desktop UI and failure states without accessing family photos. They do not prove live Neon or Blob integration. Before production, run the cloud smoke test below.
+Unit tests replace external services. SQL integration tests use PGlite (an in-memory PostgreSQL runtime) to exercise the actual schema, reservation constraints, and upload ownership without contacting Neon. PGlite is a development-only dependency; it does not replace Neon at runtime. Browser tests use signed test sessions and deliberately unavailable storage, exercising the mobile/desktop UI and failure states without accessing family photos. They do not prove live Neon or R2 integration. Before production, run the cloud smoke test below.
 
 ## Launch and deployment status
 
 [PR #1](https://github.com/pyousefi/catoctin/pull/1) implements [issue #2](https://github.com/pyousefi/catoctin/issues/2). [Launch verification](docs/verification/2026-09-08-nonprod.md) and [mobile/deletion evidence](docs/verification/2026-09-09-mobile-and-deletion.md) record local and live nonproduction checks. See [GitHub releases](https://github.com/pyousefi/catoctin/releases) and [deployment runs](https://github.com/pyousefi/catoctin/actions) for the current production version and deployment outcome.
 
-The repository is private. GitHub `nonprod`/`prod` environments contain project/team identifiers and inherit the repository-level `VERCEL_TOKEN`. Each environment uses separate Neon and private Blob resources. Production is served at `https://www.campcatoctin.org`; the apex redirects there.
+The repository is private. GitHub `nonprod`/`prod` environments contain project/team identifiers and inherit the repository-level `VERCEL_TOKEN`. Each environment uses a separate Neon database. This migration keeps legacy private Blob resources readable while adopting separate R2 prefixes. Production is served at `https://www.campcatoctin.org`; the apex redirects there.
 
 On the current GitHub plan, private-repository rulesets are unavailable: `main` is unprotected and `prod` has no required reviewer. Publishing a stable GitHub release is the explicit production promotion action. The owner authorized the initial merge and production release after requesting the additional UI coverage and logout fix. Do not mistake the environment name for an enforced approval gate.
 
@@ -65,13 +65,13 @@ Local CLI calls in this setup use `env -u VERCEL_TOKEN npx --yes vercel@59.12.0 
 Use the Vercel CLI, following the deployment mechanics used by the sibling Zahra project. CLI version 59.12.0 is pinned in CI.
 
 1. Run `vercel login`, then `vercel link` for this directory. Use a Vercel address initially unless a custom domain is chosen.
-2. Create/connect Neon Postgres and a **private** Vercel Blob store. Provision separate nonprod/prod resources. Private Blob storage is required; a public store would bypass application photo authorization.
+2. Connect separate Neon databases for nonprod/prod and the private Cloudflare R2 `catoctin` bucket. Set `R2_PREFIX=preview` for Preview and `R2_PREFIX=production` for Production. Keep public bucket access disabled; use a bucket-scoped Object Read & Write R2 token. The app remains hosted on Vercel.
 3. Configure all variables in `.env.example` in Vercel **Preview** and **Production**. Leave production values out of Preview. Use `vercel env add <NAME> preview` / `production` interactively, or the Vercel dashboard; never paste secrets into chat or commit them.
 4. Pull each environment to an ignored env file, validate it with `scripts/check-env.mjs`, and apply `scripts/schema.sql` with `scripts/setup-db.mjs`. Vercel pulls sensitive Preview/Production values as `[SENSITIVE]`. CI uses `scripts/check-env.mjs --allow-redacted` to verify required keys and any unredacted values; the runtime receives the actual secrets from Vercel. Strict local validation requires the original private values. The setup is additive and idempotent. Back up the database before future schema changes; schema changes are not auto-applied during app builds.
 5. Create GitHub environments `nonprod` and `prod`. Set `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` as environment secrets. Project and organization IDs come from `.vercel/project.json`. Add a required human reviewer to `prod` and protect `main` with the `check` job. These settings require authenticated GitHub administration and are not created by a YAML file.
 6. `vercel.json` disables automatic Git deployments, so GitHub Actions controls promotion. Vercel's account-level deployment protection can remain enabled for nonprod. For the family-facing production address, use the app’s password gate instead of requiring a Vercel account.
 
-**Upload callbacks:** the Blob SDK verifies signed completion callbacks. If Vercel deployment protection blocks those callbacks on nonprod, the authenticated browser also confirms completion using Blob metadata. Keep the page open until it reports success. On a production custom domain, verify callback delivery in Vercel logs too.
+**Direct uploads:** The browser receives one-hour signed R2 part URLs after authenticated, same-origin reservation. Originals transfer in 8 MiB parts; the server verifies part sizes and completes the upload. Keep the page open until confirmation succeeds. Legacy Blob callbacks remain supported for in-flight uploads; configured R2 deployments refuse new Blob tokens. See [R2 migration and cutover](docs/operations/r2-migration.md).
 
 ## Trunk-based CI/CD and releases
 
@@ -102,9 +102,9 @@ For an application rollback, use Vercel’s supported rollback to the previous p
 Use synthetic photos in nonprod; do not copy family originals there.
 
 1. Verify signed-out requests redirect to `/login`; direct `/api/photos/<id>` returns 401; family sessions cannot access `/admin` or admin APIs.
-2. Upload a JPEG and an iPhone HEIC to 2026, plus a photo to an older year. Test a file larger than 4.5 MB to exercise direct Blob upload. Confirm progress, retry after disconnect, and successful completion after refresh.
+2. Upload a JPEG and an iPhone HEIC to 2026, plus a photo to an older year. Test a file larger than 4.5 MB to exercise direct R2 multipart upload. Confirm progress, retry after disconnect, and successful completion after refresh.
 3. Download each original and a ZIP. Compare SHA-256 hashes to the sources. Confirm filenames and embedded photo metadata are intact.
-4. Verify raw private Blob URLs are inaccessible without a Blob token. Hide a photo as admin and verify a family session can no longer retrieve its ID directly.
+4. Verify unsigned R2 object URLs are inaccessible. Hide a photo as admin and verify a family session can no longer retrieve its ID directly.
 5. Add a test photo to the intended Google album manually, confirm it there, and only then mark it as added on the site.
 6. Confirm release logs contain the intended SHA/environment and production uses its own secrets and stores. Test on an actual iPhone and Android phone; Chromium mobile emulation is not an iOS Safari test.
 
@@ -122,8 +122,8 @@ For Google Photos and other phone apps, see the [device/source matrix, recovery 
 
 - Session cookies are HTTP-only, Secure in production, SameSite=Lax, and expire in seven days. Rotate `SESSION_SECRET` to revoke all existing sessions. Changing a password alone prevents new sign-ins but does not revoke existing sessions.
 - Password attempts are limited to 15 per IP per 15 minutes in Postgres; database failure blocks sign-in. Expired `rate_limits` rows can be pruned during maintenance.
-- `MAX_STORAGE_BYTES` defaults to 50 GiB of reserved originals. Atomic database reservations prevent concurrent uploads from exceeding this cap. It is not a billing cap: reads, transfer, and database usage can still incur charges. Configure provider spend alerts as appropriate.
-- Failed/abandoned uploads retain pending reservations until reconciliation. Run `node --env-file=.env.local scripts/reconcile-uploads.mjs` to inspect reservations older than 48 hours; add `--apply` after reviewing the dry run. It recovers matching originals and atomically releases only reservations confirmed absent by Blob. Authentication/service errors stop the command; mismatched originals retain capacity for manual review. Reconciliation does not delete stored files. Administrator-confirmed deletion is separate; no automatic retention runs.
+- `MAX_STORAGE_BYTES` defaults to 10 GiB of reserved originals. Atomic database reservations prevent concurrent uploads from exceeding this cap. It is not a billing cap: reads, transfer, and database usage can still incur charges. Configure provider spend alerts as appropriate.
+- Failed/abandoned uploads retain pending reservations until reconciliation. Run `node --env-file=.env.local scripts/reconcile-uploads.mjs` to inspect reservations older than 48 hours; add `--apply` after reviewing the dry run. It recovers matching originals and atomically releases only reservations confirmed absent by the relevant storage provider. Authentication/service errors stop the command; mismatched originals retain capacity for manual review. For missing R2 objects, reconciliation aborts pending multipart uploads before releasing capacity and rechecks for concurrent completion. It does not delete completed originals. Administrator-confirmed deletion is separate; no automatic retention runs.
 - The gallery loads originals lazily, so large originals can use substantial bandwidth. Introduce separately stored thumbnails when actual usage justifies that additional image-processing surface; preserve the original as the source of truth.
 - Back up Postgres and private originals independently. The site is a sharing tool, not the sole backup of family memories.
 - Real shared-album URLs belong only in the server-only `GOOGLE_ALBUM_<year>_URL` environment variables. Never commit them, include them in client imports, or copy them into test fixtures. Keep the repository private while historical commits contain links.
@@ -131,8 +131,8 @@ For Google Photos and other phone apps, see the [device/source matrix, recovery 
 
 See [the security/storage decision](docs/decisions/0001-private-family-photo-storage/README.md) and [running log](NEXT.md).
 
-Upload recovery reads phone originals with FileReader in 8 MiB chunks before and during multipart transfer. The first read precedes storage authorization, so immediately unreadable provider files do not reserve capacity. Reselecting failed originals replaces stale handles and preserves uploaded/confirmed items. The adapter chunk size does not cap the Blob SDK’s own multipart buffering. Authenticated failure diagnostics log only an attempt UUID, phase, byte count and fixed error category, once per phase/category per batch; they exclude filenames, attribution and raw errors. Physical Android/iOS provider handoffs still require device testing.
+Upload recovery prefers a continuous provider stream, falling back to FileReader for providers that cannot stream. The first read precedes storage authorization, so immediately unreadable files do not reserve capacity. Reselecting failed originals replaces stale handles and preserves confirmed items. Direct R2 transfer uses one 8 MiB buffer, retains it for part retries, and cancels the provider on failure. Authenticated diagnostics include only attempt UUID, phase, byte count, and fixed error category; filenames, attribution, raw errors, credentials, and signed URLs stay out of logs. Physical Android/iOS provider handoffs still require device testing.
 
 The footer and password screen show the deployed version and short commit ID. CI embeds `NEXT_PUBLIC_APP_VERSION` from the release tag (or `preview` on main) and `NEXT_PUBLIC_APP_COMMIT` from the checked-out commit during the build. Manual preview builds should set both values; unconfigured local builds display `development`.
 
-README deployment badges update after a successful deployment and show that environment’s release/preview version plus short commit ID. Nonprod links to its GitHub deployment history, where each new deployment includes its site URL. Badge data is public version metadata in a dedicated Blob store; photo stores remain private. CDN/badge caches can delay updates by several minutes. Manual/out-of-band deployments must also run `scripts/publish-deployment-badge.mjs` with the verified environment, version, commit and dedicated `DEPLOYMENT_BADGE_TOKEN`; never use a photo-store token.
+README deployment badges update after a successful deployment and show that environment’s release/preview version plus short commit ID. Nonprod links to its GitHub deployment history, where each new deployment includes its site URL. Badge data is public version metadata in a dedicated Blob store; R2 photo storage remains private. CDN/badge caches can delay updates by several minutes. Manual/out-of-band deployments must also run `scripts/publish-deployment-badge.mjs` with the verified environment, version, commit and dedicated `DEPLOYMENT_BADGE_TOKEN`; never use a photo-store token.

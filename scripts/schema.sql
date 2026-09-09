@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS photos (
   transferred_at timestamptz
 );
 CREATE INDEX IF NOT EXISTS photos_year_created ON photos(year, created_at DESC);
+ALTER TABLE photos ADD COLUMN IF NOT EXISTS r2_upload_id text;
 CREATE TABLE IF NOT EXISTS rate_limits (
   key text PRIMARY KEY,
   attempts integer NOT NULL,

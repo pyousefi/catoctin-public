@@ -10,6 +10,7 @@ export type Photo = {
   size: number;
   content_type: string;
   pathname: string;
+  r2_upload_id?: string | null;
   status: "pending" | "ready" | "archived";
   hidden: boolean;
   created_at: string;

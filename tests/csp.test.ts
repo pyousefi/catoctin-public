@@ -14,6 +14,9 @@ describe("direct photo upload network policy", () => {
       .slice(1);
     expect(connect).toContain("https://vercel.com/api/blob/");
     expect(connect).toContain("https://*.blob.vercel-storage.com");
+    expect(connect).toContain(
+      "https://catoctin.5fdfcf94759d7740311baa0d897374d0.r2.cloudflarestorage.com",
+    );
     expect(connect).not.toContain("*");
     expect(connect).not.toContain("https:");
   });

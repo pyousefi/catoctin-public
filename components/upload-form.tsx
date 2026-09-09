@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { upload } from "@vercel/blob/client";
+import { uploadToR2 } from "@/lib/upload-to-r2";
 import { readPhotoForUpload } from "@/lib/read-photo";
 import {
   reportUploadFailure,
@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { years } from "@/lib/albums";
-import { formatBytes, photoType } from "@/lib/uploads";
+import { formatBytes } from "@/lib/uploads";
 import {
   PHOTO_ACCEPT,
   selectPhotos,
@@ -110,34 +110,22 @@ export function UploadForm() {
           });
           const body = await readPhotoForUpload(item.file);
           phase = "transfer";
-          const extension = item.file.name.split(".").pop()!.toLowerCase();
-          const target = `photos/${year}/${crypto.randomUUID()}.${extension}`;
-          try {
-            const blob = await upload(target, body, {
-              access: "private",
-              contentType: photoType(item.file.name)!,
-              handleUploadUrl: "/api/uploads",
-              multipart: true,
-              clientPayload: JSON.stringify({
-                year,
-                name: item.file.name,
-                size: item.file.size,
-                contributor,
-                caption,
+          const uploaded = await uploadToR2(
+            body,
+            {
+              year,
+              name: item.file.name,
+              size: item.file.size,
+              contributor,
+              caption,
+            },
+            (loaded) =>
+              update(item.id, {
+                progress: Math.min(100, (loaded / item.file.size) * 100),
               }),
-              onUploadProgress: ({ loaded }) =>
-                update(item.id, {
-                  progress: Math.min(100, (loaded / item.file.size) * 100),
-                }),
-            });
-            pathname = blob.pathname;
-            update(item.id, { pathname });
-          } finally {
-            if (!body.locked) {
-              // Release the provider even if authorization fails before the SDK reads it.
-              await body.cancel().catch(() => {});
-            }
-          }
+          );
+          pathname = uploaded.pathname;
+          update(item.id, { pathname });
         }
         phase = "confirmation";
         update(item.id, { state: "confirming", progress: 100 });

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 function testSession(role: "family" | "admin") {
   const payload = Buffer.from(
     JSON.stringify({
@@ -248,7 +248,7 @@ test("a failed upload can be retried with its chosen year and contributor", asyn
     [];
   await page.route("**/api/uploads", async (route) => {
     const body = route.request().postDataJSON();
-    attempts.push(JSON.parse(body.payload.clientPayload));
+    attempts.push(body);
     await route.fulfill({
       status: 400,
       json: { error: "Upload temporarily unavailable. Please retry." },
@@ -291,8 +291,8 @@ test("a large photo uses multipart and its failure does not stop the remaining q
   await page.route("**/api/uploads", async (route) => {
     const body = route.request().postDataJSON();
     attempts.push({
-      multipart: body.payload.multipart,
-      ...JSON.parse(body.payload.clientPayload),
+      multipart: body.action === "r2.create",
+      ...body,
     });
     await route.fulfill({
       status: 400,
@@ -367,9 +367,7 @@ test("unreadable phone files reserve no storage and a fresh selection replaces f
   const attempts: string[] = [];
   const reports: Array<{ code: string; phase: string }> = [];
   await page.route("**/api/uploads", async (route) => {
-    attempts.push(
-      JSON.parse(route.request().postDataJSON().payload.clientPayload).name,
-    );
+    attempts.push(route.request().postDataJSON().name);
     await route.fulfill({
       status: 400,
       json: { error: "Synthetic transfer failure" },
@@ -443,9 +441,7 @@ for (const method of ["stream", "file_reader"] as const) {
     }, method);
     const attempts: string[] = [];
     await page.route("**/api/uploads", async (route) => {
-      attempts.push(
-        JSON.parse(route.request().postDataJSON().payload.clientPayload).name,
-      );
+      attempts.push(route.request().postDataJSON().name);
       await route.fulfill({
         status: 400,
         json: { error: "Synthetic transfer failure" },
@@ -474,3 +470,67 @@ for (const method of ["stream", "file_reader"] as const) {
     await expect(page.getByText(/This photo couldn’t be read/)).toHaveCount(0);
   });
 }
+
+test("R2 multipart preserves original bytes and retries confirmation without reuploading", async ({
+  page,
+  context,
+}) => {
+  const original = Buffer.alloc(8 * 1024 * 1024 + 7, 37);
+  const accepted: Buffer[] = [];
+  let reservations = 0;
+  let confirmations = 0;
+  const endpoint =
+    "https://catoctin.5fdfcf94759d7740311baa0d897374d0.r2.cloudflarestorage.com";
+  await page.route("**/api/uploads", async (route) => {
+    reservations++;
+    expect(route.request().postDataJSON()).toMatchObject({
+      action: "r2.create",
+      size: original.length,
+    });
+    await route.fulfill({
+      json: {
+        pathname: "r2/preview/photos/2026/test.jpg",
+        partBytes: 8 * 1024 * 1024,
+        urls: [`${endpoint}/part1`, `${endpoint}/part2`],
+      },
+    });
+  });
+  await page.route(`${endpoint}/**`, async (route) => {
+    if (route.request().method() === "PUT")
+      accepted.push(route.request().postDataBuffer()!);
+    await route.fulfill({
+      status: 204,
+      headers: {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "PUT",
+        "access-control-allow-headers": "content-type",
+      },
+    });
+  });
+  await page.route("**/api/uploads/complete", async (route) => {
+    confirmations++;
+    await route.fulfill(
+      confirmations === 1
+        ? { status: 503, json: { error: "Please retry confirmation" } }
+        : { json: { ok: true } },
+    );
+  });
+  await signIn(context);
+  await page.goto("/");
+  await page.getByLabel("Your name").fill("R2 camper");
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "original.jpg",
+    mimeType: "image/jpeg",
+    buffer: original,
+  });
+  await page
+    .getByRole("button", { name: "Share 1 photo", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Retry unfinished photos" }).click();
+  await expect.poll(() => confirmations).toBe(2);
+  expect(reservations).toBe(1);
+  expect(accepted.map((part) => part.length)).toEqual([8 * 1024 * 1024, 7]);
+  expect(
+    createHash("sha256").update(Buffer.concat(accepted)).digest("hex"),
+  ).toBe(createHash("sha256").update(original).digest("hex"));
+});

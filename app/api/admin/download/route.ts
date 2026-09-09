@@ -1,6 +1,6 @@
 import { ZipArchive } from "archiver";
 import { PassThrough, Readable } from "node:stream";
-import { get } from "@vercel/blob";
+import { getPhotoObject as get } from "@/lib/photo-storage";
 import { z } from "zod";
 import { session, sameOrigin } from "@/lib/auth";
 import { db, type Photo } from "@/lib/db";

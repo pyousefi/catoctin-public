@@ -1,7 +1,11 @@
 import { pathToFileURL } from "node:url";
 const required = [
   "DATABASE_URL",
-  "BLOB_READ_WRITE_TOKEN",
+  "R2_ENDPOINT",
+  "R2_BUCKET",
+  "R2_PREFIX",
+  "R2_ACCESS_KEY_ID",
+  "R2_SECRET_ACCESS_KEY",
   "FAMILY_PASSWORD_HASH",
   "ADMIN_PASSWORD_HASH",
   "SESSION_SECRET",
@@ -15,6 +19,24 @@ export function validateEnvironment(values, { allowRedacted = false } = {}) {
   const missing = required.filter((name) => !values[name]);
   if (missing.length)
     throw new Error(`Missing configuration: ${missing.join(", ")}`);
+  if (!redacted(values.R2_ENDPOINT)) {
+    const endpoint = new URL(values.R2_ENDPOINT);
+    if (
+      endpoint.protocol !== "https:" ||
+      !/^[a-f0-9]{32}\.r2\.cloudflarestorage\.com$/.test(endpoint.hostname) ||
+      endpoint.pathname !== "/" ||
+      endpoint.search ||
+      endpoint.hash ||
+      endpoint.username ||
+      endpoint.password ||
+      endpoint.port
+    )
+      throw new Error("Invalid R2 endpoint");
+  }
+  if (!["production", "preview"].includes(values.R2_PREFIX))
+    throw new Error("R2_PREFIX must be production or preview");
+  if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(values.R2_BUCKET))
+    throw new Error("Invalid R2 bucket");
   if (!redacted(values.SESSION_SECRET) && values.SESSION_SECRET.length < 32)
     throw new Error("SESSION_SECRET must contain at least 32 characters");
   for (const name of ["FAMILY_PASSWORD_HASH", "ADMIN_PASSWORD_HASH"]) {
@@ -29,7 +51,7 @@ export function validateEnvironment(values, { allowRedacted = false } = {}) {
     values.FAMILY_PASSWORD_HASH === values.ADMIN_PASSWORD_HASH
   )
     throw new Error("Use different family and admin passwords");
-  const bytes = Number(values.MAX_STORAGE_BYTES ?? 53687091200);
+  const bytes = Number(values.MAX_STORAGE_BYTES ?? 10737418240);
   if (
     !redacted(values.MAX_STORAGE_BYTES) &&
     (!Number.isSafeInteger(bytes) || bytes < 1)

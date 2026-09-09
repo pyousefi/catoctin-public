@@ -4,6 +4,15 @@
 
 # Next
 
+## 2026-09-09 — Move private originals to Cloudflare R2 (#19)
+
+- Verify a live 50-photo R2 batch including a 27 MB original, original/ZIP SHA-256 integrity, cancellation, deletion replay denial, and legacy migration. Restore test capacity; configure environment prefixes/budgets and additive schema before release.
+
+- Upload directly to private R2 in bounded 8 MiB parts, with server-side size checks, session-owned completion, cancellation, retry, and separate preview/production paths. Keep legacy originals readable during migration.
+- Preserve original photo and ZIP access, capacity reservations, and permanent deletion; handle concurrent cancellation, completion, migration, and deletion without reporting false success.
+- Add a dry-run-first migration command that verifies size, MIME, and SHA-256 before switching metadata, retains Blob sources, and cleans only unreferenced R2 copies after concurrent deletion. Reconcile missing R2 uploads by aborting parts before releasing capacity.
+- Validate R2 deployment settings and document credentials, additive schema setup, private bucket CORS, staged cutover, and source-cleanup approval. Public deployment badges keep their separate metadata-only Blob store.
+
 ## 2026-09-09 — Unblock mobile browser verification (#7)
 
 - Remove the unused system-Chrome apt source (both legacy `.list` and deb822 `.sources` formats) on disposable CI runners before installing Playwright dependencies. Its repeated checksum mismatch blocked browser setup; tests continue using Playwright’s pinned browser downloads and normal package validation.

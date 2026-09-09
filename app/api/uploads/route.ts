@@ -1,17 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { handleUpload } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { session, sameOrigin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { completeUpload } from "@/lib/complete-upload";
 import { photoType, uploadInput } from "@/lib/uploads";
+import { startR2Upload, cancelR2Upload } from "@/lib/r2-uploads";
+export const DELETE = cancelR2Upload;
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as HandleUploadBody;
+    const body = await request.json();
+    if (body?.action === "r2.create") return await startR2Upload(request, body);
     const result = await handleUpload({
       request,
       body,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
+        if (process.env.R2_BUCKET)
+          throw new Error("Reload this page to upload to R2");
         if (!sameOrigin(request)) throw new Error("Invalid origin");
         const current = await session();
         if (!current) throw new Error("Sign in to upload photos");

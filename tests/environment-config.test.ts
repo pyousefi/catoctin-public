@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import { validateEnvironment } from "../scripts/check-env.mjs";
 const valid = {
   DATABASE_URL: "test-database",
-  BLOB_READ_WRITE_TOKEN: "test-token",
+  R2_ENDPOINT: `https://${"a".repeat(32)}.r2.cloudflarestorage.com`,
+  R2_BUCKET: "catoctin",
+  R2_PREFIX: "preview",
+  R2_ACCESS_KEY_ID: "test-id",
+  R2_SECRET_ACCESS_KEY: "test-secret",
   FAMILY_PASSWORD_HASH: `scrypt:${"a".repeat(32)}:${"a".repeat(128)}`,
   ADMIN_PASSWORD_HASH: `scrypt:${"b".repeat(32)}:${"b".repeat(128)}`,
   SESSION_SECRET: "s".repeat(32),
@@ -38,6 +42,12 @@ describe("deployment environment validation", () => {
     ).toThrow("Missing configuration: SESSION_SECRET");
   });
   it.each([
+    { R2_ENDPOINT: "https://example.com" },
+    {
+      R2_ENDPOINT: `https://${"a".repeat(32)}.r2.cloudflarestorage.com/catoctin`,
+    },
+    { R2_PREFIX: "../production" },
+    { R2_BUCKET: "" },
     { SESSION_SECRET: "short" },
     { FAMILY_PASSWORD_HASH: "plaintext" },
     { ADMIN_PASSWORD_HASH: valid.FAMILY_PASSWORD_HASH },
