@@ -1,7 +1,10 @@
+"use client";
+import { useState } from "react";
 import Link from "next/link";
 import { Camera, Download } from "lucide-react";
 import { canPreview } from "@/lib/uploads";
 import type { Photo } from "@/lib/db";
+import { PhotoViewer } from "./photo-viewer";
 export function Gallery({
   photos,
   year,
@@ -13,6 +16,7 @@ export function Gallery({
   unavailable: boolean;
   page: number;
 }) {
+  const [viewerId, setViewerId] = useState<string | null>(null);
   return (
     <section id="camp-photos" className="section gallery-section">
       <div className="section-heading">
@@ -54,10 +58,12 @@ export function Gallery({
         <div className="photo-grid">
           {photos.map((photo) => (
             <article className="photo-card" key={photo.id}>
-              <a
-                href={`/api/photos/${photo.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.currentTarget.focus();
+                  setViewerId(photo.id);
+                }}
                 className="photo-preview"
                 aria-label={`Open ${photo.name}`}
               >
@@ -79,7 +85,7 @@ export function Gallery({
                     <small>Download to view</small>
                   </div>
                 )}
-              </a>
+              </button>
               <div className="photo-info">
                 <div>
                   <strong>{photo.contributor}</strong>
@@ -115,6 +121,14 @@ export function Gallery({
           </Link>
         )}
       </div>
+      {viewerId && (
+        <PhotoViewer
+          key={viewerId}
+          photos={photos}
+          initialId={viewerId}
+          onClose={() => setViewerId(null)}
+        />
+      )}
     </section>
   );
 }

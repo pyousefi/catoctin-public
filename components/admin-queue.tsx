@@ -17,6 +17,7 @@ import {
   type SelectedPhoto,
 } from "@/lib/admin-selection";
 import { deleteSelectedPhotos } from "@/lib/delete-selected-photos";
+import { PhotoViewer } from "./photo-viewer";
 export function AdminQueue({
   photos: initialPhotos,
   year,
@@ -31,6 +32,7 @@ export function AdminQueue({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [viewerId, setViewerId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<SelectedPhoto[] | null>(null);
   const [deleted, setDeleted] = useState<string[]>([]);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
@@ -223,13 +225,22 @@ export function AdminQueue({
                 )
               }
             />
-            <div className="admin-thumbnail">
+            <button
+              type="button"
+              className="admin-thumbnail"
+              aria-label={`Open ${photo.name}`}
+              disabled={locked}
+              onClick={(event) => {
+                event.currentTarget.focus();
+                setViewerId(photo.id);
+              }}
+            >
               {canPreview(photo.content_type) ? (
                 <img src={`/api/photos/${photo.id}`} alt="" loading="lazy" />
               ) : (
                 <ImageIcon size={28} />
               )}
-            </div>
+            </button>
             <div className="admin-photo-info">
               <strong>{photo.name}</strong>
               <p>
@@ -287,6 +298,14 @@ export function AdminQueue({
           </article>
         ))}
       </form>
+      {viewerId && (
+        <PhotoViewer
+          key={viewerId}
+          photos={photos}
+          initialId={viewerId}
+          onClose={() => setViewerId(null)}
+        />
+      )}
       {deleting && (
         <dialog
           ref={deleteDialog}

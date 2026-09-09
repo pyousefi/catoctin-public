@@ -199,6 +199,7 @@ export default async function Home({
           <UploadForm />
         </section>
         <Gallery
+          key={`${year}:${page}`}
           photos={photos}
           year={year}
           unavailable={unavailable}

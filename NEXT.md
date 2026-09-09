@@ -1,3 +1,8 @@
+## 2026-09-09 — Browse uploaded photos in a viewer (#23)
+
+- Open family and organizer thumbnails in an accessible modal with previous/next controls, arrow keys, mobile swipes, captions, and original downloads. Keep navigation in the current page's displayed order, preserve authenticated photo access, and explain unavailable previews and unsupported formats.
+- Restore focus and page scrolling on close, stop at page boundaries, and verify the real components with isolated browser fixtures across desktop and mobile browsers. Declare esbuild as a test-only bundler so real components can be exercised without production test routes or live storage.
+
 ## 2026-09-09 — Scan credentials and private album links in CI (#20)
 
 - Add checksum-pinned Gitleaks with default credential rules and Google Photos shared-link detection across HEAD ancestry, including merge-only changes. Verify redaction, exact synthetic-fixture exceptions, and a single historical public-digest fingerprint with disposable Git fixtures. Document the retained PR-reference exposure and required public-readiness follow-up.
