@@ -27,6 +27,10 @@ export async function reportUploadFailure(
         phase,
         bytes,
         code: uploadFailureCode(error),
+        ...(error instanceof PhotoReadError &&
+        Object.keys(error.readFailures).length
+          ? { readFailures: error.readFailures }
+          : {}),
       }),
       signal: AbortSignal.timeout(3000),
     });

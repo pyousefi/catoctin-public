@@ -6,7 +6,7 @@ Reported symptom: large photos or large selections from Google Photos fail. The 
 
 ## Immediate workaround
 
-Keep the browser visible and the phone awake. Start with 5–10 photos on reliable Wi-Fi. For a cloud-only original, download it to the phone first, then select it through Files or Gallery. Each file must be at most 200 MiB (shown as 200 MB in the UI); a batch can hold 50 photos. Complete one batch before choosing the next. A file above the limit needs a smaller exported copy; the application does not compress originals automatically.
+Keep the browser visible and the phone awake. Start with 5–10 photos on reliable Wi-Fi, using the intended source directly, including cloud-only originals. Each file must be at most 200 MiB (shown as 200 MB in the UI); a batch can hold 50 photos. Complete one batch before choosing the next. A file above the limit needs a smaller exported copy; the application does not compress originals automatically.
 
 If transfer fails, keep the page open and use **Retry unfinished photos**. Completed photos are skipped. A file whose upload succeeded but whose confirmation failed is confirmed again without retransferring it. Refreshing or closing the page loses the local queue and retry state; background recovery and resumable uploads across reloads are not implemented.
 
@@ -60,8 +60,16 @@ Automated coverage: `npm test` checks exact size boundaries, partial/full queues
 
 ## Remedy according to evidence
 
-- Provider preparation failure: local download first, smaller picker selections, provider/OS update; a website cannot control the native provider's download queue.
+- Provider preparation failure: distinguish failure inside the native picker from a failed browser File read. Test a continuous read of the original File and an unsliced FileReader read before attributing it to cloud-only availability. Do not require downloading an original based only on a generic read error.
 - Oversize original: clearly reject it and export a smaller copy. Increase the product limit only after real-device, storage-budget and timeout tests justify it.
 - Part/network failure: confirm SDK retries and eventual failure behavior on the affected device before changing transfer logic. Consider persisted resumable uploads only if interruption remains a reproduced problem.
 - Confirmation failure: retry confirmation using the existing pathname and investigate the completion service/status.
 - Quota failure: inspect reserved capacity and reconcile abandoned attempts before treating it as a photo-size issue.
+
+## Pixel Camera regression (2026-09-09)
+
+Chrome on Pixel 10 Pro: Choose photos → Collections → Camera → select photos → upload. The latest attempt failed for every selected photo, whereas the preceding attempt uploaded four. Production diagnostics recorded a 6,419,912-byte file failing during `reading`, before authorization; the old report did not include the browser error name, so the exact provider cause is unproven.
+
+The reader now opens the original File as one continuous stream. It only falls back before emitting bytes, using the original unsliced File with FileReader for files up to 8 MiB and bounded slices for larger files. This avoids requiring seeking from providers when continuous reading works and avoids mixing bytes from separate reads. Both readers enforce the selected byte count. Diagnostic `readFailures` contains only fixed `stream`/`file_reader` reason codes, never provider messages or content URIs.
+
+Automated non-seekable-provider simulations cover both reading paths. Repeat the actual Camera path with a fresh selection, then Google Photos and Files with the same originals, on the deployed version. Check saved counts and downloaded hashes. Physical Pixel results remain pending in #7; simulated providers cannot establish that the native handoff is fixed.

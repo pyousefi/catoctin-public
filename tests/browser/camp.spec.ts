@@ -207,7 +207,7 @@ test("empty photos are rejected before any upload starts", async ({
   });
 
   await expect(page.locator("main").getByRole("alert")).toContainText(
-    "Download the original to your phone",
+    "Choose it again from your photo picker",
   );
   await expect(
     page.getByRole("button", { name: "Share your photos" }),
@@ -343,7 +343,16 @@ test("unreadable phone files reserve no storage and a fresh selection replaces f
 }) => {
   await page.addInitScript(() => {
     const original = FileReader.prototype.readAsArrayBuffer;
+    const originalStream = File.prototype.stream;
     let fail = true;
+    File.prototype.stream = function () {
+      if (fail)
+        throw new DOMException(
+          "Synthetic unreadable source",
+          "NotReadableError",
+        );
+      return originalStream.call(this);
+    };
     FileReader.prototype.readAsArrayBuffer = function (blob: Blob) {
       if (fail) {
         queueMicrotask(() => this.dispatchEvent(new ProgressEvent("error")));
@@ -385,9 +394,7 @@ test("unreadable phone files reserve no storage and a fresh selection replaces f
   await expect(
     page.getByRole("button", { name: "Retry unfinished photos" }),
   ).toBeEnabled();
-  await expect(
-    page.getByText(/Your phone couldn’t read this photo/),
-  ).toHaveCount(2);
+  await expect(page.getByText(/This photo couldn’t be read/)).toHaveCount(2);
   expect(attempts).toEqual([]);
   await expect.poll(() => reports.length).toBe(1);
   expect(reports[0]).toMatchObject({
@@ -412,3 +419,58 @@ test("unreadable phone files reserve no storage and a fresh selection replaces f
   ).toBeEnabled();
   expect(attempts).toEqual(["first.jpg", "second.jpg"]);
 });
+
+for (const method of ["stream", "file_reader"] as const) {
+  test(`a provider that cannot slice reaches upload through ${method}`, async ({
+    page,
+    context,
+  }) => {
+    await page.addInitScript((method) => {
+      File.prototype.slice = function () {
+        throw new DOMException(
+          "Synthetic non-seekable provider",
+          "NotReadableError",
+        );
+      };
+      if (method === "file_reader") {
+        File.prototype.stream = function () {
+          throw new DOMException(
+            "Synthetic stream failure",
+            "NotReadableError",
+          );
+        };
+      }
+    }, method);
+    const attempts: string[] = [];
+    await page.route("**/api/uploads", async (route) => {
+      attempts.push(
+        JSON.parse(route.request().postDataJSON().payload.clientPayload).name,
+      );
+      await route.fulfill({
+        status: 400,
+        json: { error: "Synthetic transfer failure" },
+      });
+    });
+    await page.route("**/api/uploads/failure", (route) =>
+      route.fulfill({ status: 204 }),
+    );
+    await signIn(context);
+    await page.goto("/");
+    await page.getByLabel("Your name").fill("Test camper");
+    await page.locator('input[type="file"]').setInputFiles([
+      {
+        name: "camera.jpg",
+        mimeType: "image/jpeg",
+        buffer: Buffer.alloc(method === "stream" ? 9 * 1024 * 1024 : 4, 7),
+      },
+    ]);
+    await page
+      .getByRole("button", { name: "Share 1 photo", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Retry unfinished photos" }),
+    ).toBeVisible();
+    expect(attempts).toEqual(["camera.jpg"]);
+    await expect(page.getByText(/This photo couldn’t be read/)).toHaveCount(0);
+  });
+}

@@ -21,7 +21,7 @@ export function selectPhotos<T extends Photo>(existing: T[], incoming: T[]) {
       );
     } else if (file.size === 0) {
       errors.push(
-        `${file.name}: this photo is empty. Download the original to your phone, then choose it from Files or Gallery.`,
+        `${file.name}: this photo is empty. Choose it again from your photo picker.`,
       );
     } else if (file.size > MAX_FILE_BYTES) {
       errors.push(`${file.name}: this photo exceeds the 200 MB limit.`);
@@ -59,7 +59,7 @@ export function uploadFailureMessage(error: unknown, uploaded: boolean) {
     error instanceof Error &&
     ["NotReadableError", "NotFoundError"].includes(error.name)
   ) {
-    return "Your phone couldn’t read this photo. Download the original to your phone, remove this selection, then choose it from Files or Gallery.";
+    return new PhotoReadError().message;
   }
-  return `${error instanceof Error ? error.message : "The upload failed."} Keep this page open and retry. If it keeps failing, download the original to your phone and choose it from Files or Gallery.`;
+  return `${error instanceof Error ? error.message : "The upload failed."} Keep this page open and retry.`;
 }

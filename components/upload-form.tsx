@@ -112,25 +112,32 @@ export function UploadForm() {
           phase = "transfer";
           const extension = item.file.name.split(".").pop()!.toLowerCase();
           const target = `photos/${year}/${crypto.randomUUID()}.${extension}`;
-          const blob = await upload(target, body, {
-            access: "private",
-            contentType: photoType(item.file.name)!,
-            handleUploadUrl: "/api/uploads",
-            multipart: true,
-            clientPayload: JSON.stringify({
-              year,
-              name: item.file.name,
-              size: item.file.size,
-              contributor,
-              caption,
-            }),
-            onUploadProgress: ({ loaded }) =>
-              update(item.id, {
-                progress: Math.min(100, (loaded / item.file.size) * 100),
+          try {
+            const blob = await upload(target, body, {
+              access: "private",
+              contentType: photoType(item.file.name)!,
+              handleUploadUrl: "/api/uploads",
+              multipart: true,
+              clientPayload: JSON.stringify({
+                year,
+                name: item.file.name,
+                size: item.file.size,
+                contributor,
+                caption,
               }),
-          });
-          pathname = blob.pathname;
-          update(item.id, { pathname });
+              onUploadProgress: ({ loaded }) =>
+                update(item.id, {
+                  progress: Math.min(100, (loaded / item.file.size) * 100),
+                }),
+            });
+            pathname = blob.pathname;
+            update(item.id, { pathname });
+          } finally {
+            if (!body.locked) {
+              // Release the provider even if authorization fails before the SDK reads it.
+              await body.cancel().catch(() => {});
+            }
+          }
         }
         phase = "confirmation";
         update(item.id, { state: "confirming", progress: 100 });
@@ -240,9 +247,9 @@ export function UploadForm() {
         </span>
       </div>
       <p className="muted">
-        Choosing from Google Photos or another cloud app? Wait for the originals
-        to download. If selection fails, try 5–10 photos at a time, or download
-        them to your phone and choose them from Files or Gallery.
+        Choose directly from Google Photos, Camera, Files, or another app
+        available in your photo picker. Keep this page open while your photos
+        upload.
       </p>
       <label htmlFor="caption">
         A little story to go with them{" "}

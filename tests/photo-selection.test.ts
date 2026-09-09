@@ -33,7 +33,7 @@ describe("mobile photo selection", () => {
   it("explains how to recover an empty cloud-provider file", () => {
     expect(selectPhotos([], [photo("cloud.jpg", 0)])).toEqual({
       files: [],
-      notice: expect.stringContaining("Download the original to your phone"),
+      notice: expect.stringContaining("Choose it again"),
     });
   });
 
@@ -83,12 +83,12 @@ describe("mobile photo selection", () => {
 
 describe("upload recovery guidance", () => {
   it.each(["NotReadableError", "NotFoundError"])(
-    "gives local-original guidance for %s",
+    "suggests picker retry without assuming a cloud-only original for %s",
     (name) => {
       const error = new Error("Cannot read file");
       error.name = name;
       expect(uploadFailureMessage(error, false)).toContain(
-        "remove this selection",
+        "Choose it again from your photo picker",
       );
     },
   );

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { session, sameOrigin } from "@/lib/auth";
 import { MAX_FILE_BYTES } from "@/lib/uploads";
+import { PHOTO_READ_REASONS } from "@/lib/read-photo";
 
 const failureInput = z
   .object({
@@ -8,6 +9,13 @@ const failureInput = z
     phase: z.enum(["reading", "transfer", "confirmation"]),
     bytes: z.number().int().positive().max(MAX_FILE_BYTES),
     code: z.enum(["photo_unreadable", "network_or_service", "upload_failed"]),
+    readFailures: z
+      .object({
+        stream: z.enum(PHOTO_READ_REASONS).optional(),
+        file_reader: z.enum(PHOTO_READ_REASONS).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

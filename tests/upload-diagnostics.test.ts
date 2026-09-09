@@ -42,9 +42,42 @@ describe("private upload diagnostics", () => {
     { ...input, name: "private.jpg" },
     { ...input, code: "arbitrary text" },
     { ...input, bytes: -1 },
+    { ...input, readFailures: { stream: "private provider URI" } },
+    { ...input, readFailures: { file_reader: "unknown", message: "private" } },
   ])("rejects untrusted diagnostic fields", async (body) => {
     expect((await POST(request(body))).status).toBe(400);
     expect(console.warn).not.toHaveBeenCalled();
+  });
+  it("accepts fixed reader reasons without logging provider messages", async () => {
+    const report = {
+      ...input,
+      readFailures: {
+        stream: "not_readable",
+        file_reader: "permission_denied",
+      },
+    };
+    expect((await POST(request(report))).status).toBe(204);
+    expect(console.warn).toHaveBeenCalledWith("Photo upload failed", report);
+  });
+  it("includes reader reasons in client reports", async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetch);
+    const readFailures = {
+      stream: "not_readable",
+      file_reader: "unknown",
+    } as const;
+    await reportUploadFailure(
+      input.attemptId,
+      "reading",
+      input.bytes,
+      new PhotoReadError(readFailures),
+    );
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({
+      ...input,
+      readFailures,
+    });
   });
   it("rejects oversized reports", async () => {
     expect(

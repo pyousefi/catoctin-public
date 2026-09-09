@@ -1,5 +1,16 @@
 # Next
 
+## 2026-09-09 — Unblock mobile browser verification (#7)
+
+- Remove the unused system-Chrome apt source (both legacy `.list` and deb822 `.sources` formats) on disposable CI runners before installing Playwright dependencies. Its repeated checksum mismatch blocked browser setup; tests continue using Playwright’s pinned browser downloads and normal package validation.
+
+## 2026-09-09 — Read Android picker files without seeking (#7)
+
+- Prefer a continuous read from the original File, keeping one provider handle open instead of repeatedly slicing Android content-provider files. Validate the byte count and retain backpressure.
+- Fall back before emitting bytes to FileReader; read photos up to 8 MiB directly and keep larger fallback reads bounded. Release provider handles when authorization or transfer fails, and abort an active fallback FileReader when its upload is cancelled.
+- Replace the unsupported download-original instruction with picker retry guidance, including empty-file browser assertions. Record only fixed browser failure reasons for each reader so inaccessible files and reader incompatibilities can be distinguished.
+- Add regressions for providers that reject slices, both-reader failures, truncation, cancellation, and diagnostic validation. Native Pixel 10 Pro / Chrome / Collections → Camera verification remains open in #7.
+
 ## 2026-09-09 — Track deployed versions at the top of README (#16)
 
 - Add live prod/nonprod version badges backed by a dedicated public metadata store, with no family-photo storage access.
