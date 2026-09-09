@@ -127,3 +127,5 @@ For Google Photos and other phone apps, see the [device/source matrix, recovery 
 - The family password protects this site and its stored photos. Existing Google albums remain governed by Google’s own sharing settings. Anyone who already has a shared Google album link may still view it outside this site.
 
 See [the security/storage decision](docs/decisions/0001-private-family-photo-storage/README.md) and [running log](NEXT.md).
+
+Upload recovery reads phone originals with FileReader in 8 MiB chunks before and during multipart transfer. The first read precedes storage authorization, so immediately unreadable provider files do not reserve capacity. Reselecting failed originals replaces stale handles and preserves uploaded/confirmed items. The adapter chunk size does not cap the Blob SDK’s own multipart buffering. Authenticated failure diagnostics log only an attempt UUID, phase, byte count and fixed error category, once per phase/category per batch; they exclude filenames, attribution and raw errors. Physical Android/iOS provider handoffs still require device testing.

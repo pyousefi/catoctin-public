@@ -1,3 +1,4 @@
+import { PhotoReadError } from "./read-photo";
 import { MAX_FILE_BYTES, photoType } from "./uploads";
 
 export const MAX_BATCH_PHOTOS = 50;
@@ -50,6 +51,7 @@ function identity(file: Photo) {
 }
 
 export function uploadFailureMessage(error: unknown, uploaded: boolean) {
+  if (error instanceof PhotoReadError) return error.message;
   if (uploaded) {
     return "The file uploaded, but we couldn’t confirm it was saved. Keep this page open and retry to confirm without sending the file again.";
   }

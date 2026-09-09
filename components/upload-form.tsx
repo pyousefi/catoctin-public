@@ -1,6 +1,12 @@
 "use client";
 import { useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
+import { readPhotoForUpload } from "@/lib/read-photo";
+import {
+  reportUploadFailure,
+  uploadFailureCode,
+  type UploadPhase,
+} from "@/lib/upload-diagnostics";
 import { useRouter } from "next/navigation";
 import {
   Camera,
@@ -39,12 +45,32 @@ export function UploadForm() {
     );
   function choose(files: FileList | null) {
     if (!files || busy) return;
+    const matches = (file: File, other: File) =>
+      file.name === other.name && file.size === other.size;
+    const incoming = Array.from(files).filter(
+      (file) =>
+        !items.some(
+          (item) =>
+            (item.state === "done" || Boolean(item.pathname)) &&
+            matches(file, item.file),
+        ),
+    );
+    const replaced = new Set(
+      items
+        .filter(
+          (item) =>
+            item.state === "error" &&
+            !item.pathname &&
+            incoming.some((file) => matches(file, item.file)),
+        )
+        .map((item) => item.id),
+    );
     const selection = selectPhotos(
-      items.map((item) => item.file),
-      Array.from(files),
+      items.filter((item) => !replaced.has(item.id)).map((item) => item.file),
+      incoming,
     );
     setItems((current) => [
-      ...current,
+      ...current.filter((item) => !replaced.has(item.id)),
       ...selection.files.map((file) => ({
         id: crypto.randomUUID(),
         file,
@@ -53,7 +79,6 @@ export function UploadForm() {
       })),
     ]);
     setNotice(selection.notice);
-    if (fileInput.current) fileInput.current.value = "";
   }
   async function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,8 +97,10 @@ export function UploadForm() {
       event.preventDefault();
     };
     window.addEventListener("beforeunload", leaveWarning);
+    const reported = new Set<string>();
     for (const item of items.filter((item) => item.state !== "done")) {
       let pathname = item.pathname;
+      let phase: UploadPhase = pathname ? "confirmation" : "reading";
       try {
         if (!pathname) {
           update(item.id, {
@@ -81,9 +108,11 @@ export function UploadForm() {
             error: undefined,
             progress: 0,
           });
+          const body = await readPhotoForUpload(item.file);
+          phase = "transfer";
           const extension = item.file.name.split(".").pop()!.toLowerCase();
           const target = `photos/${year}/${crypto.randomUUID()}.${extension}`;
-          const blob = await upload(target, item.file, {
+          const blob = await upload(target, body, {
             access: "private",
             contentType: photoType(item.file.name)!,
             handleUploadUrl: "/api/uploads",
@@ -95,12 +124,15 @@ export function UploadForm() {
               contributor,
               caption,
             }),
-            onUploadProgress: ({ percentage }) =>
-              update(item.id, { progress: percentage }),
+            onUploadProgress: ({ loaded }) =>
+              update(item.id, {
+                progress: Math.min(100, (loaded / item.file.size) * 100),
+              }),
           });
           pathname = blob.pathname;
           update(item.id, { pathname });
         }
+        phase = "confirmation";
         update(item.id, { state: "confirming", progress: 100 });
         const response = await fetch("/api/uploads/complete", {
           method: "POST",
@@ -113,6 +145,12 @@ export function UploadForm() {
         }
         update(item.id, { state: "done", progress: 100 });
       } catch (error) {
+        const code = uploadFailureCode(error);
+        const reportKey = `${phase}:${code}`;
+        if (!reported.has(reportKey)) {
+          reported.add(reportKey);
+          void reportUploadFailure(item.id, phase, item.file.size, error);
+        }
         update(item.id, {
           state: "error",
           pathname,
@@ -186,7 +224,14 @@ export function UploadForm() {
           className="button secondary"
           type="button"
           disabled={busy || complete}
-          onClick={() => fileInput.current?.click()}
+          onClick={() => {
+            if (
+              fileInput.current &&
+              items.some((item) => item.state === "error")
+            )
+              fileInput.current.value = "";
+            fileInput.current?.click();
+          }}
         >
           <Upload size={18} /> Choose photos
         </button>

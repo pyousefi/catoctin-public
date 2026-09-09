@@ -336,3 +336,79 @@ test("a large photo uses multipart and its failure does not stop the remaining q
     "Keep this page open and retry",
   );
 });
+
+test("unreadable phone files reserve no storage and a fresh selection replaces failed handles", async ({
+  page,
+  context,
+}) => {
+  await page.addInitScript(() => {
+    const original = FileReader.prototype.readAsArrayBuffer;
+    let fail = true;
+    FileReader.prototype.readAsArrayBuffer = function (blob: Blob) {
+      if (fail) {
+        queueMicrotask(() => this.dispatchEvent(new ProgressEvent("error")));
+      } else original.call(this, blob);
+    };
+    Object.assign(window, {
+      allowPhotoReads: () => {
+        fail = false;
+      },
+    });
+  });
+  const attempts: string[] = [];
+  const reports: Array<{ code: string; phase: string }> = [];
+  await page.route("**/api/uploads", async (route) => {
+    attempts.push(
+      JSON.parse(route.request().postDataJSON().payload.clientPayload).name,
+    );
+    await route.fulfill({
+      status: 400,
+      json: { error: "Synthetic transfer failure" },
+    });
+  });
+  await page.route("**/api/uploads/failure", async (route) => {
+    reports.push(route.request().postDataJSON());
+    await route.fulfill({ status: 204 });
+  });
+  await signIn(context);
+  await page.goto("/");
+  await page.getByLabel("Your name").fill("Test camper");
+  const files = ["first.jpg", "second.jpg"].map((name) => ({
+    name,
+    mimeType: "image/jpeg",
+    buffer: Buffer.from([255, 216, 255, 217]),
+  }));
+  await page.locator('input[type="file"]').setInputFiles(files);
+  await page
+    .getByRole("button", { name: "Share 2 photos", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Retry unfinished photos" }),
+  ).toBeEnabled();
+  await expect(
+    page.getByText(/Your phone couldn’t read this photo/),
+  ).toHaveCount(2);
+  expect(attempts).toEqual([]);
+  await expect.poll(() => reports.length).toBe(1);
+  expect(reports[0]).toMatchObject({
+    phase: "reading",
+    code: "photo_unreadable",
+  });
+  expect(
+    await page
+      .locator('input[type="file"]')
+      .evaluate((input: HTMLInputElement) => input.files?.length),
+  ).toBe(2);
+  await page.evaluate(() =>
+    (window as unknown as { allowPhotoReads: () => void }).allowPhotoReads(),
+  );
+  await page.locator('input[type="file"]').setInputFiles(files);
+  await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(2);
+  await page
+    .getByRole("button", { name: "Share 2 photos", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Retry unfinished photos" }),
+  ).toBeEnabled();
+  expect(attempts).toEqual(["first.jpg", "second.jpg"]);
+});

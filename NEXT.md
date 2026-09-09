@@ -1,5 +1,12 @@
 # Next
 
+## 2026-09-09 — Diagnose and recover Android photo-source read failures (#7)
+
+- Preserve picker selections and read originals through FileReader in bounded 8 MiB chunks, checking the first chunk before requesting upload storage. Keep original bytes and multipart progress.
+- Identify provider-read failures separately from network transfer, and let fresh selections replace failed file handles while preserving completed uploads.
+- Add authenticated, same-origin, strictly validated failure categories without photo names, contributor names or raw exceptions. Send at most one diagnostic per phase/category in each batch.
+- Cover unreadable/truncated files, chunk boundaries, cancellation, source-read errors before storage reservation and reselecting failed originals. Native Pixel/Chrome verification remains required.
+
 ## 2026-09-09 — Select all originals in a year and delete selected originals (#11)
 
 - Replace page-only selection with an explicit year-wide snapshot across pages, including hidden originals; reset selection when changing years.
